@@ -1,6 +1,4 @@
-# =============================================================================
 # data_engine.py  —  Pure StatsBomb JSON parser
-#
 # ROOT CAUSE FIX: kloppy's to_pandas() stores coordinates as Point objects
 # in a single 'coordinates' column, NOT as 'x'/'y' float columns. This broke
 # every downstream module. Solution: bypass kloppy entirely and parse the raw
@@ -12,7 +10,6 @@
 #   player_name → str (e.g. "Jan Oblak")
 #   event_type → str  (e.g. "Pass", "Shot")
 #   result     → str  (e.g. "Complete", "Goal")
-# =============================================================================
 
 import io
 import json
@@ -21,17 +18,13 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-# ---------------------------------------------------------------------------
 # CONSTANTS
-# ---------------------------------------------------------------------------
 BASE_URL       = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
 COMPETITION_ID = 55    # UEFA Euro 2024
 SEASON_ID      = 282
 
 
-# ---------------------------------------------------------------------------
 # LOW-LEVEL HELPERS
-# ---------------------------------------------------------------------------
 def _fetch_json(url: str):
     """Stream a JSON file from GitHub. Raises HTTPError on 404/5xx."""
     r = requests.get(url, timeout=30)
@@ -46,9 +39,9 @@ def _safe_float(val) -> float:
         return np.nan
 
 
-# ---------------------------------------------------------------------------
+
 # STEP 1A  –  MATCH LIST
-# ---------------------------------------------------------------------------
+
 @st.cache_data(show_spinner="Loading Euro 2024 fixture list…")
 def get_match_list() -> pd.DataFrame:
     """
@@ -78,9 +71,9 @@ def get_match_list() -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values("match_date").reset_index(drop=True)
 
 
-# ---------------------------------------------------------------------------
+
 # STEP 1B  –  PARSE RAW STATSBOMB EVENTS → CLEAN DATAFRAME
-# ---------------------------------------------------------------------------
+
 def _parse_statsbomb_events(raw_events: list) -> pd.DataFrame:
     """
     Convert a raw StatsBomb events list (from JSON) into a flat, typed DataFrame.
@@ -174,9 +167,9 @@ def _parse_statsbomb_events(raw_events: list) -> pd.DataFrame:
     return df
 
 
-# ---------------------------------------------------------------------------
+
 # STEP 1C  –  LOAD EVENTS (CACHED)
-# ---------------------------------------------------------------------------
+
 @st.cache_data(show_spinner="Streaming match events from StatsBomb…")
 def get_match_events(match_id: int) -> pd.DataFrame:
     """
@@ -188,9 +181,9 @@ def get_match_events(match_id: int) -> pd.DataFrame:
     return _parse_statsbomb_events(raw)
 
 
-# ---------------------------------------------------------------------------
+
 # STEP 1D  –  LOAD 360° FREEZE FRAMES (CACHED)
-# ---------------------------------------------------------------------------
+
 @st.cache_data(show_spinner="Loading 360° freeze frames…")
 def get_freeze_frames(match_id: int) -> dict:
     """
@@ -235,17 +228,15 @@ def get_freeze_frames(match_id: int) -> dict:
     return frames
 
 
-# ---------------------------------------------------------------------------
+
 # STEP 1E  –  CONVENIENCE LOADER
-# ---------------------------------------------------------------------------
 def load_match_data(match_id: int) -> tuple:
     """Load and return (events_df, freeze_frames_dict) for a match."""
     return get_match_events(match_id), get_freeze_frames(match_id)
 
 
-# ---------------------------------------------------------------------------
+
 # UTILITY FUNCTIONS
-# ---------------------------------------------------------------------------
 def get_teams(df: pd.DataFrame) -> list:
     """Return list of unique team names present in the events DataFrame."""
     return sorted(df["team_name"].dropna().unique().tolist())
