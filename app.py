@@ -56,10 +56,6 @@ _PLOT_CFG = {"displayModeBar": False, "responsive": True}
 if "current_page" not in st.session_state:
     st.session_state.current_page = "Euro 2024 Analytics"
 
-PLAYERS_CSV_PATH = os.path.join(os.path.dirname(__file__), "players_info.csv")
-
-
-
 # page selector on the sidebar
 with st.sidebar:
     st.markdown("## ⚽ Analytics Dashboard")
@@ -544,4 +540,4 @@ if st.session_state.current_page == "Euro 2024 Analytics":
 
 else:
     # PLAYER STATS PAGE
-    render_player_stats_page(PLAYERS_CSV_PATH)
+    render_player_stats_page()

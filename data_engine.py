@@ -141,8 +141,10 @@ def _parse_statsbomb_events(raw_events: list) -> pd.DataFrame:
             "timestamp"          : evt.get("timestamp", ""),
             "minute"             : int(evt.get("minute", 0)),
             "second"             : int(evt.get("second", 0)),
+            "possession"         : int(evt.get("possession", 0)),
             # Clean string event type — no enum objects
             "event_type"         : evt.get("type", {}).get("name", "Unknown"),
+            "play_pattern"       : evt.get("play_pattern", {}).get("name", ""),
             "team_id"            : str(evt.get("team", {}).get("id", "")),
             "team_name"          : evt.get("team", {}).get("name", ""),
             "player_id"          : str(evt.get("player", {}).get("id", "")),
@@ -155,6 +157,7 @@ def _parse_statsbomb_events(raw_events: list) -> pd.DataFrame:
             "result"             : result,
             "pass_recipient_id"  : pass_recipient_id,
             "pass_recipient_name": pass_recipient_name,
+            "shot_type"          : evt.get("shot", {}).get("type", {}).get("name", "") if "shot" in evt else "",
             "statsbomb_xg"       : statsbomb_xg,
         })
 
