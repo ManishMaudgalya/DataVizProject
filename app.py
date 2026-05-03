@@ -56,6 +56,8 @@ _PLOT_CFG = {"displayModeBar": False, "responsive": True}
 if "current_page" not in st.session_state:
     st.session_state.current_page = "Euro 2024 Analytics"
 
+PLAYERS_CSV_PATH = os.path.join(os.path.dirname(__file__), "players_info.csv")
+
 # page selector on the sidebar
 with st.sidebar:
     st.markdown("## ⚽ Analytics Dashboard")
@@ -111,7 +113,7 @@ if st.session_state.current_page == "Euro 2024 Analytics":
         st.markdown("---")
         st.markdown("**Dataset:** StatsBomb Open Data")
         st.markdown("**Coords:** 120×80 yards (StatsBomb)")
-        st.caption("Master's Capstone Project")
+        st.caption("")
 
     # Filtered data
     fdf        = filter_by_time(events_df, minute_range[0], minute_range[1])
@@ -252,18 +254,22 @@ if st.session_state.current_page == "Euro 2024 Analytics":
 
         with st.spinner("Computing team shape…"):
             try:
-                if show_both:
-                    fig_both = plot_team_shape_both(
-                        fdf, sel_team, opp_team,
-                        minute_min=minute_range[0], minute_max=minute_range[1],
-                    )
-                    st.plotly_chart(fig_both, use_container_width=True, config=_PLOT_CFG)
-                else:
-                    fig_shape = plot_team_shape_single(
-                        fdf, sel_team,
-                        minute_min=minute_range[0], minute_max=minute_range[1],
-                    )
-                    st.plotly_chart(fig_shape, use_container_width=True, config=_PLOT_CFG)
+                        if show_both:
+                            fig_a, fig_b = plot_team_shape_both(
+                                fdf, sel_team, opp_team,
+                                minute_min=minute_range[0], minute_max=minute_range[1],
+                            )
+                            col_left, col_right = st.columns(2)
+                            with col_left:
+                                st.plotly_chart(fig_a, use_container_width=True, config=_PLOT_CFG)
+                            with col_right:
+                                st.plotly_chart(fig_b, use_container_width=True, config=_PLOT_CFG)
+                        else:
+                            fig_shape = plot_team_shape_single(
+                                fdf, sel_team,
+                                minute_min=minute_range[0], minute_max=minute_range[1],
+                            )
+                            st.plotly_chart(fig_shape, use_container_width=True, config=_PLOT_CFG)
             except Exception as e:
                 st.error(f"Team shape error: {e}")
 
@@ -276,7 +282,7 @@ if st.session_state.current_page == "Euro 2024 Analytics":
             f"■ Cyan = {sel_team}  ·  ■ Pink = {opp_team}*"
         )
 
-        ctrl3, viz3 = st.columns([1, 4])
+        ctrl3, viz3 = st.columns([2, 5])
 
         with ctrl3:
             if not freeze_frames:
