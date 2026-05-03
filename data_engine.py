@@ -1,9 +1,4 @@
 # data_engine.py  —  Pure StatsBomb JSON parser
-# ROOT CAUSE FIX: kloppy's to_pandas() stores coordinates as Point objects
-# in a single 'coordinates' column, NOT as 'x'/'y' float columns. This broke
-# every downstream module. Solution: bypass kloppy entirely and parse the raw
-# StatsBomb JSON ourselves. This gives us complete control over column names
-# and guarantees:
 #   x, y       → float, start location
 #   end_x, end_y → float, end location (passes/carries/shots)
 #   team_name  → str  (e.g. "Slovenia")
@@ -41,7 +36,6 @@ def _safe_float(val) -> float:
 
 
 # STEP 1A  –  MATCH LIST
-
 @st.cache_data(show_spinner="Loading Euro 2024 fixture list…")
 def get_match_list() -> pd.DataFrame:
     """
@@ -172,7 +166,6 @@ def _parse_statsbomb_events(raw_events: list) -> pd.DataFrame:
 
 
 # STEP 1C  –  LOAD EVENTS (CACHED)
-
 @st.cache_data(show_spinner="Streaming match events from StatsBomb…")
 def get_match_events(match_id: int) -> pd.DataFrame:
     """
@@ -186,7 +179,6 @@ def get_match_events(match_id: int) -> pd.DataFrame:
 
 
 # STEP 1D  –  LOAD 360° FREEZE FRAMES (CACHED)
-
 @st.cache_data(show_spinner="Loading 360° freeze frames…")
 def get_freeze_frames(match_id: int) -> dict:
     """
@@ -239,7 +231,7 @@ def load_match_data(match_id: int) -> tuple:
 
 
 
-# UTILITY FUNCTIONS
+#FUNCTIONS
 def get_teams(df: pd.DataFrame) -> list:
     """Return list of unique team names present in the events DataFrame."""
     return sorted(df["team_name"].dropna().unique().tolist())

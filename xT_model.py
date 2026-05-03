@@ -1,11 +1,4 @@
-# =============================================================================
 # xT_model.py  —  Expected Threat (12×8 Markov Chain)
-#
-# FIX: compute_threat_added was filtering by df["team_id"] but the caller
-#      passes a team NAME string (e.g. "Germany").  team_id is a numeric
-#      string like "944" — the comparison always failed → empty DataFrame →
-#      "No threat data available".  Fixed to use df["team_name"].
-# =============================================================================
 
 import numpy as np
 import pandas as pd
@@ -14,46 +7,43 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
 from matplotlib.colors import LinearSegmentedColormap, Normalize
+from mplsoccer import Pitch
 
-try:
-    from pass_network import (
-        PITCH_BG, LINE_COLOR, CYAN_NEON, PINK_NEON,
-        GOLD_NEON, WHITE_GLOW, _make_pitch,
+# ── Theme constants (kept as *_NEON/_GLOW aliases so the rest of this
+#    module stays readable). The actual hex values match pass_network.py.
+PITCH_BG    = "#0b0c10"
+LINE_COLOR  = "#1f2833"
+CYAN_NEON   = "#66fcf1"
+PINK_NEON   = "#ff00ff"
+GOLD_NEON   = "#f5c518"
+WHITE_GLOW  = "#ffffff"
+
+
+def _make_pitch():
+    """mplsoccer pitch with the Cyberpunk theme baked in."""
+    pitch = Pitch(
+        pitch_type="statsbomb",
+        pitch_color=PITCH_BG,
+        line_color=LINE_COLOR,
+        linewidth=1.0,
+        corner_arcs=True,
+        goal_type="box",
     )
-except Exception:
-    PITCH_BG   = "#0b0c10"
-    LINE_COLOR = "#1f2833"
-    CYAN_NEON  = "#66fcf1"
-    PINK_NEON  = "#ff00ff"
-    GOLD_NEON  = "#f5c518"
-    WHITE_GLOW = "#ffffff"
+    fig, ax = pitch.draw(figsize=(12, 8))
+    fig.patch.set_facecolor(PITCH_BG)
+    return fig, ax, pitch
 
-    def _make_pitch():
-        from mplsoccer import Pitch
-        pitch = Pitch(pitch_type="statsbomb", pitch_color=PITCH_BG,
-                      line_color=LINE_COLOR, linewidth=1.0,
-                      corner_arcs=True, goal_type="box")
-        fig, ax = pitch.draw(figsize=(12, 8))
-        fig.patch.set_facecolor(PITCH_BG)
-        return fig, ax, pitch
 
-# Alias so xT_model works standalone
-LINE_COLOR = "#1f2833"
-CYAN_NEON  = "#66fcf1"
-PINK_NEON  = "#ff00ff"
-GOLD_NEON  = "#f5c518"
-WHITE_GLOW = "#ffffff"
-
-# ── Grid constants ───────────────────────────────────────────────────────────
+# grid 
 XT_COLS = 12
 XT_ROWS = 8
 PITCH_W = 120.0
 PITCH_H = 80.0
 
 
-# ============================================================================
+
 # COORDINATE HELPERS
-# ============================================================================
+
 
 def coords_to_grid(x: float, y: float) -> tuple:
     col = int(np.clip(int(x / PITCH_W * XT_COLS), 0, XT_COLS - 1))
@@ -67,9 +57,7 @@ def grid_to_center(col: int, row: int) -> tuple:
     return col * cw + cw / 2.0, row * ch + ch / 2.0
 
 
-# ============================================================================
-# BUILD TRANSITION MATRIX
-# ============================================================================
+# BUILD MATRIX
 
 def build_transition_matrix(df: pd.DataFrame) -> tuple:
     """
@@ -118,6 +106,9 @@ def build_transition_matrix(df: pd.DataFrame) -> tuple:
     p_shoot = np.clip(shoot_counts / np.maximum(action_counts, 1e-9), 0, 1)
     p_goal_raw = goal_counts / np.maximum(shoot_counts, 1e-9)
 
+    # Bayesian-smooth conversion rate with a geometric distance prior.
+    # Empirical rate is trusted fully once a zone has ≥20 shots; below that,
+    # it's blended linearly with the prior.
     p_goal = np.zeros((XT_COLS, XT_ROWS))
     for c in range(XT_COLS):
         for ro in range(XT_ROWS):
@@ -131,10 +122,8 @@ def build_transition_matrix(df: pd.DataFrame) -> tuple:
     return T, p_shoot, p_goal
 
 
-# ============================================================================
-# VALUE ITERATION SOLVER
-# ============================================================================
 
+# VALUE SOLVER
 def solve_xt(T, p_shoot, p_goal, n_iter=60, convergence_threshold=1e-5):
     """Solve Bellman equation: xT(z) = P(shoot)*P(goal) + P(move)*Σ T*xT """
     xT     = np.zeros((XT_COLS, XT_ROWS))
@@ -150,10 +139,7 @@ def solve_xt(T, p_shoot, p_goal, n_iter=60, convergence_threshold=1e-5):
     return xT
 
 
-# ============================================================================
 # COMPUTE PER-ACTION THREAT ADDED
-# ============================================================================
-
 def compute_threat_added(df: pd.DataFrame, xT_grid: np.ndarray,
                          team_name: str) -> pd.DataFrame:
     """
@@ -200,10 +186,7 @@ def compute_threat_added(df: pd.DataFrame, xT_grid: np.ndarray,
     return actions[out_cols].reset_index(drop=True)
 
 
-# ============================================================================
 # VISUALISATIONS (matplotlib / mplsoccer)
-# ============================================================================
-
 def plot_xt_grid(xT_grid: np.ndarray, title: str = "Expected Threat (xT) Grid") -> plt.Figure:
     fig, ax, _ = _make_pitch()
 

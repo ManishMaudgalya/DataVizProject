@@ -1,19 +1,9 @@
-# =============================================================================
+
 # pitch_control.py  —  Voronoi Pitch Control + Team Shape (Plotly)
-#
-# FIX #1 (float crash): np.linspace num argument must be int.
-#         PITCH_W * res = 120.0 * 2 = 240.0 (float) → crashed numpy.
-#         Fixed with explicit int() cast.
-# FIX #2 (invisible marks): all pitch shapes use layer="below".
-#         Imported via _pitch_shapes() from pass_network.
-# FIX #3: Team shape comparison now renders side-by-side in a subplot
-#         layout instead of stacked vertically.
-# =============================================================================
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 from pass_network import (
     _base_pitch_figure, _pitch_shapes,
@@ -24,19 +14,10 @@ PITCH_W = 120.0
 PITCH_H = 80.0
 
 
-# ============================================================================
-# VORONOI RASTERIZATION
-# ============================================================================
-
+# VORONOI
 def _rasterize_voronoi(freeze_frame: list, res: int = 2) -> np.ndarray:
     """
     Rasterize pitch into a team-ownership grid via nearest-player distance.
-
-    FIX: int(PITCH_W * res) and int(PITCH_H * res) — PITCH_W is a float
-    (120.0), multiplying by int res gives a float, and np.linspace's `num`
-    argument must be an integer.  The previous code passed 240.0 which raised
-    "TypeError: 'float' object cannot be interpreted as an integer".
-
     Returns team_grid shape (H*res, W*res):  +1 = attacking, -1 = defending
     """
     if not freeze_frame:
@@ -60,10 +41,8 @@ def _rasterize_voronoi(freeze_frame: list, res: int = 2) -> np.ndarray:
     return is_teammate[nearest].reshape(gy.shape)
 
 
-# ============================================================================
-# PITCH CONTROL FIGURE
-# ============================================================================
 
+# PITCH CONTROL 
 def plot_pitch_control(
     freeze_frame: list,
     event_description: str = "",
@@ -72,9 +51,7 @@ def plot_pitch_control(
     team_b_name: str = "Defending team",
 ) -> go.Figure:
     """
-    Interactive Voronoi pitch control.
-
-    Layers (bottom → top, all above the pitch shapes):
+    Layers
       1. Heatmap — team-ownership colour fill
       2. Glowing player dots with hover cards
     """
@@ -187,21 +164,16 @@ def plot_pitch_control(
     return fig
 
 
-# ============================================================================
 # TEAM SHAPE — single team
-# ============================================================================
-
 def plot_team_shape_single(
     df: pd.DataFrame,
     team_name: str,
     minute_min: int = 0,
     minute_max: int = 130,
+    color: str = PINK,
+    height: int = 560,
 ) -> go.Figure:
-    """
-    Average player positions for one team in the selected time window.
-    Marker size ∝ event involvement volume.
-    """
-    fig = _base_pitch_figure(height=560)
+    fig = _base_pitch_figure(height=height)
 
     team_df = df[
         (df["team_name"] == team_name) &
@@ -239,7 +211,7 @@ def plot_team_shape_single(
         fig.add_trace(go.Scatter(
             x=stats_df["avg_x"].tolist(), y=stats_df["avg_y"].tolist(),
             mode="markers",
-            marker=dict(size=[s + gi * 12 for s in sizes], color=PINK,
+            marker=dict(size=[s + gi * 12 for s in sizes], color=color,
                         opacity=0.09 / gi, line=dict(width=0)),
             showlegend=False, hoverinfo="none",
         ))
@@ -257,7 +229,7 @@ def plot_team_shape_single(
         x=stats_df["avg_x"].tolist(),
         y=stats_df["avg_y"].tolist(),
         mode="markers+text",
-        marker=dict(size=sizes, color=PINK, opacity=1.0,
+        marker=dict(size=sizes, color=color, opacity=1.0,
                     line=dict(color=WHITE, width=2)),
         text=last_names,
         textposition="bottom center",
@@ -267,102 +239,37 @@ def plot_team_shape_single(
         name=f"{team_name} players",
     ))
 
+    # Title annotation INSIDE the figure (so each side-by-side pitch is labelled)
+    fig.add_annotation(
+        x=60, y=77, text=f"<b>{team_name}</b>",
+        font=dict(color=color, size=14, family="Courier New"),
+        showarrow=False, xanchor="center",
+    )
+
     return fig
 
 
-# ============================================================================
-# TEAM SHAPE — both teams side-by-side
-# ============================================================================
 
+# TEAM SHAPE — both teams (returns TWO figures for side-by-side rendering)
 def plot_team_shape_both(
     df: pd.DataFrame,
     team_a: str,
     team_b: str,
     minute_min: int = 0,
     minute_max: int = 130,
-) -> go.Figure:
+) -> tuple:
     """
-    Side-by-side team shape comparison in a single Plotly figure with two
-    subplots.  Much more readable than stacking two separate charts vertically.
+    Build TWO independent team-shape figures — one per team — for the caller
+    to render side-by-side via st.columns.
+
+    Returns (fig_a, fig_b).
     """
-    fig = make_subplots(
-        rows=1, cols=2,
-        subplot_titles=[team_a, team_b],
-        horizontal_spacing=0.04,
+    fig_a = plot_team_shape_single(
+        df, team_a, minute_min=minute_min, minute_max=minute_max,
+        color=CYAN, height=480,
     )
-
-    def _team_traces(team_name: str, color: str):
-        team_df = df[
-            (df["team_name"] == team_name) &
-            df["x"].notna() & df["y"].notna() &
-            df["minute"].between(minute_min, minute_max) &
-            df["player_name"].notna()
-        ].copy()
-
-        if team_df.empty:
-            return []
-
-        stats = []
-        for pname, grp in team_df.groupby("player_name"):
-            stats.append({
-                "player_name": pname,
-                "avg_x"      : float(grp["x"].mean()),
-                "avg_y"      : float(grp["y"].mean()),
-                "n_events"   : len(grp),
-                "n_passes"   : int((grp["event_type"] == "Pass").sum()),
-                "n_shots"    : int((grp["event_type"] == "Shot").sum()),
-            })
-        sd = pd.DataFrame(stats)
-        mx  = float(sd["n_events"].max()); mn = float(sd["n_events"].min())
-        rng = max(mx - mn, 1.0)
-        sizes = [16 + 22 * (r.n_events - mn) / rng for _, r in sd.iterrows()]
-
-        hover = [
-            f"<b>{r.player_name}</b><br>Events: {r.n_events}<br>"
-            f"Passes: {r.n_passes}  Shots: {r.n_shots}"
-            for _, r in sd.iterrows()
-        ]
-        return [go.Scatter(
-            x=sd["avg_x"].tolist(), y=sd["avg_y"].tolist(),
-            mode="markers+text",
-            marker=dict(size=sizes, color=color, opacity=1.0,
-                        line=dict(color=WHITE, width=2)),
-            text=[n.split()[-1] for n in sd["player_name"]],
-            textposition="bottom center",
-            textfont=dict(color=CYAN, size=9, family="Courier New"),
-            hovertext=hover, hoverinfo="text",
-            name=team_name,
-        )]
-
-    for trace in _team_traces(team_a, CYAN):
-        fig.add_trace(trace, row=1, col=1)
-    for trace in _team_traces(team_b, PINK):
-        fig.add_trace(trace, row=1, col=2)
-
-    # Apply pitch shapes to both subplots
-    shapes = _pitch_shapes()
-    for shape in shapes:
-        fig.add_shape(**shape, row=1, col=1)
-        fig.add_shape(**shape, row=1, col=2)
-
-    fig.update_layout(
-        paper_bgcolor=PITCH_BG, plot_bgcolor=PITCH_BG,
-        height=520,
-        margin=dict(l=5, r=5, t=35, b=10),
-        showlegend=False,
-        hoverlabel=dict(bgcolor="#1a2332", bordercolor=CYAN,
-                        font=dict(color=WHITE, size=12, family="Courier New")),
+    fig_b = plot_team_shape_single(
+        df, team_b, minute_min=minute_min, minute_max=minute_max,
+        color=PINK, height=480,
     )
-    # Style both axes
-    for axis in ["xaxis", "yaxis", "xaxis2", "yaxis2"]:
-        fig.update_layout(**{axis: dict(
-            range=[-3, 123] if "x" in axis else [-3, 83],
-            showgrid=False, zeroline=False,
-            showticklabels=False, fixedrange=True,
-        )})
-    # Title colours
-    for ann in fig.layout.annotations:
-        ann.font = dict(color=CYAN, size=13, family="Courier New")
-        ann.bgcolor = PITCH_BG
-
-    return fig
+    return fig_a, fig_b

@@ -1,19 +1,10 @@
-# =============================================================================
 # pass_network.py  — Interactive Pass Network (Plotly)
-#
-# ROOT-CAUSE FIX: All pitch shapes now carry layer="below" so they render
-# BEHIND scatter traces. Previously the filled background rect defaulted to
-# layer="above", painting over every marker and line — making the network
-# "invisible" while hover still fired (because hover uses the data geometry,
-# not the visual layer).
-# =============================================================================
-
 import numpy as np
 import pandas as pd
 from collections import defaultdict
 import plotly.graph_objects as go
 
-# ── Theme constants ──────────────────────────────────────────────────────────
+# Theme
 PITCH_BG    = "#0b0c10"
 PITCH_LINES = "#1f2833"
 CYAN        = "#66fcf1"
@@ -24,9 +15,8 @@ TEXT_COLOR  = "#c5c6c7"
 DIM         = "#445566"
 
 
-# ============================================================================
+
 # PITCH HELPERS
-# ============================================================================
 
 def _pitch_shapes(lc: str = PITCH_LINES, lw: float = 1.5) -> list:
     """
@@ -118,10 +108,8 @@ def _base_pitch_figure(title: str = "", height: int = 580) -> go.Figure:
     return fig
 
 
-# ============================================================================
-# BUILD PASS NETWORK
-# ============================================================================
 
+# BUILD PASS NETWORK
 def build_pass_network(
     df: pd.DataFrame,
     team_name: str,
@@ -200,11 +188,7 @@ def build_pass_network(
 
     return nodes_df, edges_df, best_partners
 
-
-# ============================================================================
-# RENDER PASS NETWORK
-# ============================================================================
-
+#PASS NETWORK
 def plot_pass_network(
     nodes_df: pd.DataFrame,
     edges_df: pd.DataFrame,
@@ -227,7 +211,7 @@ def plot_pass_network(
 
     node_pos = nodes_df.set_index("player_id")[["avg_x","avg_y"]].to_dict("index")
 
-    # ── EDGES ──────────────────────────────────────────────────────────
+    # EDGES
     if not edges_df.empty:
         max_p = float(edges_df["pass_count"].max())
         min_p = float(edges_df["pass_count"].min())
@@ -278,7 +262,7 @@ def plot_pass_network(
                 showlegend=False,
             ))
 
-    # ── NODES ──────────────────────────────────────────────────────────
+    # NODES 
     max_n = float(nodes_df["pass_count"].max())
     min_n = float(nodes_df["pass_count"].min())
     n_rng = max(max_n - min_n, 1.0)
